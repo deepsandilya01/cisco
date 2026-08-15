@@ -1,0 +1,11 @@
+{
+  "model_name": "mistral-large-latest",
+  "confidence_threshold": 0.7,
+  "max_cases": 30,
+  "severity_levels": [
+    "Low",
+    "Medium",
+    "High",
+    "Critical"
+  ]
+}

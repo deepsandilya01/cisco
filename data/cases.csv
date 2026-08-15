@@ -1,0 +1,213 @@
+case_id,symptom,topology_note,concept_tag,severity,show_outputs,expected_fault,osi_layer
+CASE-001,PC1 cannot ping PC2 in the same subnet,"PC1 on Switch1 port Fa0/1, PC2 on Switch1 port Fa0/2",VLAN,Medium,"Switch1#show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Fa0/1, Fa0/3, Fa0/4
+10   Sales                            active    Fa0/2
+","Ports are in different VLANs (Fa0/1 in VLAN 1, Fa0/2 in VLAN 10)",Layer 2
+CASE-002,User complains of no network access,User PC connected to Switch2 Gi0/1,VLAN,Low,"Switch2#show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Fa0/1
+20   Engineering                      active    
+",Port Gi0/1 is not assigned to any active VLAN or is missing,Layer 2
+CASE-003,Host cannot reach the internet but can ping local servers,"Host IP 192.168.1.50/24, Router IP 192.168.1.1",Gateway,High,"Host>ipconfig
+
+IPv4 Address. . . . . . . . . . . : 192.168.1.50
+Subnet Mask . . . . . . . . . . . : 255.255.255.0
+Default Gateway . . . . . . . . . : 192.168.1.254
+",Default gateway on host is configured as 192.168.1.254 instead of 192.168.1.1,Layer 3
+CASE-004,Server cannot respond to remote clients,"Server IP 10.0.0.10/24, Gateway should be 10.0.0.1",Gateway,Critical,"Server>ipconfig
+
+IPv4 Address. . . . . . . . . . . : 10.0.0.10
+Subnet Mask . . . . . . . . . . . : 255.255.255.0
+Default Gateway . . . . . . . . . : 0.0.0.0
+",Default gateway is missing (0.0.0.0),Layer 3
+CASE-005,New laptop cannot obtain an IP address,"DHCP server on Router1, Laptop connected via Switch",DHCP,High,"Router1#show ip dhcp pool
+
+Pool LOCAL_LAN :
+ Utilization mark (high/low)    : 100 / 0
+ Subnet size (first/next)       : 0 / 0 
+ Total addresses                : 254
+ Leased addresses               : 254
+ Excluded addresses             : 0
+ Pending event                  : none
+",DHCP pool is exhausted (254 leased out of 254),Layer 7
+CASE-006,Clients on VLAN 20 are getting APIPA addresses (169.254.x.x),Router provides inter-VLAN routing and DHCP. VLAN 20 is on Gi0/0.20,DHCP,High,"Router#show run interface GigabitEthernet0/0.20
+Building configuration...
+
+Current configuration : 112 bytes
+!
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+end
+","Missing ip helper-address if DHCP is external, or DHCP pool for VLAN 20 is missing (implied by no response and APIPA)",Layer 7
+CASE-007,Users can ping 8.8.8.8 but cannot browse www.google.com,Host configured via static IP,DNS,Medium,"Host>ipconfig /all
+
+IPv4 Address. . . . . . . . . . . : 10.1.1.50
+Subnet Mask . . . . . . . . . . . : 255.255.255.0
+Default Gateway . . . . . . . . . : 10.1.1.1
+DNS Servers . . . . . . . . . . . : 
+",No DNS server configured on the host,Layer 7
+CASE-008,Router cannot resolve hostnames for pings,Router needs to reach update server by name,DNS,Low,"Router#show run | inc ip domain
+no ip domain-lookup
+",ip domain-lookup is disabled,Layer 7
+CASE-009,Branch office cannot reach HQ subnets,"Branch Router connected to ISP, HQ subnet is 10.0.0.0/8",Routing,Critical,"BranchRouter#show ip route
+Gateway of last resort is not set
+
+      192.168.1.0/24 is variably subnetted, 2 subnets, 2 masks
+C        192.168.1.0/24 is directly connected, GigabitEthernet0/0
+L        192.168.1.1/32 is directly connected, GigabitEthernet0/0
+",Missing default route or static route to HQ subnet,Layer 3
+CASE-010,OSPF neighbor relationship not forming between R1 and R2,R1 and R2 connected on 10.1.1.0/30,Routing,High,"R1#show ip ospf interface brief
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Gi0/0        1     0               10.1.1.1/30        1     DR    0/0
+
+R1#show run | section router ospf
+router ospf 1
+ network 10.1.1.0 0.0.0.255 area 0
+","OSPF neighbor state stuck, potentially mismatched timers or MTU, but here just no neighbors. Let's make it an area mismatch.
+R2#show run | section router ospf
+router ospf 1
+ network 10.1.1.0 0.0.0.3 area 1",Layer 3
+CASE-011,Web server in DMZ cannot be reached from outside on port 80,Edge router has inbound ACL applied on WAN interface,ACL,High,"EdgeRouter#show access-lists
+Extended IP access list 100
+    10 permit tcp any host 10.1.1.5 eq 443
+    20 deny ip any any (150 matches)
+EdgeRouter#show ip int Gi0/0 | inc access list
+  Inbound  access list is 100
+  Outbound access list is not set
+",ACL 100 permits HTTPS (443) but implicitly denies HTTP (80),Layer 3
+CASE-012,Cannot SSH to Router from admin subnet,Admin subnet is 192.168.100.0/24,ACL,Medium,"Router#show run | section line vty
+line vty 0 4
+ access-class 10 in
+ login local
+ transport input ssh
+Router#show access-lists 10
+Standard IP access list 10
+    10 permit 192.168.200.0, wildcard bits 0.0.0.255
+","VTY lines restricted to 192.168.200.0/24, admin subnet is blocked",Layer 3
+CASE-013,"Internal users cannot access the internet, but router can ping 8.8.8.8",NAT Overload configured on Edge Router,NAT,High,"EdgeRouter#show ip nat statistics
+Total active translations: 0 (0 static, 0 dynamic; 0 extended)
+EdgeRouter#show run interface Gi0/1
+interface GigabitEthernet0/1
+ description WAN
+ ip address 203.0.113.2 255.255.255.252
+ ip nat outside
+EdgeRouter#show run interface Gi0/0
+interface GigabitEthernet0/0
+ description LAN
+ ip address 192.168.1.1 255.255.255.0
+",Missing 'ip nat inside' on the LAN interface Gi0/0,Layer 4
+CASE-014,NAT translations are not occurring for Guest VLAN,Guest VLAN is 192.168.5.0/24,NAT,Medium,"Router#show access-lists 1
+Standard IP access list 1
+    10 permit 192.168.1.0, wildcard bits 0.0.0.255
+Router#show run | inc ip nat inside source
+ip nat inside source list 1 interface GigabitEthernet0/1 overload
+",NAT ACL 1 does not include the Guest VLAN subnet (192.168.5.0/24),Layer 4
+CASE-015,CDP logs show native VLAN mismatch,Switch1 Gi0/1 connected to Switch2 Gi0/1,Trunking,Medium,"Switch1#show interfaces trunk
+
+Port        Mode         Encapsulation  Status        Native vlan
+Gi0/1       on           802.1q         trunking      99
+
+Switch2#show interfaces trunk
+
+Port        Mode         Encapsulation  Status        Native vlan
+Gi0/1       on           802.1q         trunking      1
+","Native VLAN mismatch (Switch1 uses 99, Switch2 uses 1)",Layer 2
+CASE-016,VLAN 20 traffic not crossing inter-switch link,Link between switches should carry all VLANs,Trunking,High,"Switch1#show interfaces trunk
+
+Port        Mode         Encapsulation  Status        Native vlan
+Gi0/1       on           802.1q         trunking      1
+
+Port        Vlans allowed on trunk
+Gi0/1       1-10,30-4094
+",VLAN 20 is missing from the allowed VLANs list on the trunk,Layer 2
+CASE-017,Router-on-a-stick not routing for VLAN 10,VLAN 10 sub-interface is Gi0/0.10,Interface,High,"Router#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     unassigned      YES unset  up                    up      
+GigabitEthernet0/0.10  192.168.10.1    YES manual administratively down down    
+",Sub-interface Gi0/0.10 is administratively down (needs 'no shutdown'),Layer 1
+CASE-018,WAN link is down after recent maintenance,Serial interface to ISP,Interface,Critical,"Router#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+Serial0/0/0            203.0.113.1     YES manual administratively down down    
+",Serial0/0/0 interface is administratively down,Layer 1
+CASE-019,Guests can access internal company servers,"Guest subnet is 172.16.0.0/24, Internal is 10.0.0.0/8",Security,High,"Router#show access-lists GUEST_ACL
+Extended IP access list GUEST_ACL
+    10 permit ip 172.16.0.0 0.0.0.255 any
+Router#show ip int Gi0/1.50 | inc access list
+  Inbound  access list is GUEST_ACL
+  Outbound access list is not set
+","Guest ACL permits all traffic to 'any', allowing access to internal networks instead of denying it",Layer 3
+CASE-020,Wireless clients cannot get IP addresses,WLC connected to switch port Gi1/0/1,Wireless,High,"Switch#show run interface GigabitEthernet1/0/1
+interface GigabitEthernet1/0/1
+ switchport mode access
+ switchport access vlan 10
+","WLC port is configured as access mode instead of trunk, blocking multiple wireless VLANs",Layer 2
+CASE-021,Intermittent connectivity drops for Server A,Server A has static IP 192.168.1.100,IP Addressing,Critical,"Router#show ip arp | inc 192.168.1.100
+Internet  192.168.1.100           0   0000.aaaa.bbbb  ARPA   GigabitEthernet0/0
+Internet  192.168.1.100           0   0000.cccc.dddd  ARPA   GigabitEthernet0/0
+*Mar  1 00:15:22.333: %IP-4-DUPADDR: Duplicate address 192.168.1.100 on GigabitEthernet0/0
+",Duplicate IP address 192.168.1.100 detected in ARP cache and logs,Layer 3
+CASE-022,Cannot assign IP to new router interface,Configuring Gi0/1 with 10.1.1.1/24,IP Addressing,Medium,"Router#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     10.1.1.254      YES manual up                    up      
+GigabitEthernet0/1     unassigned      YES unset  up                    up      
+Router(config-if)#ip address 10.1.1.1 255.255.255.0
+% 10.1.1.0 overlaps with GigabitEthernet0/0
+",Overlapping subnet (duplicate IP space) on Gi0/0 and Gi0/1,Layer 3
+CASE-023,Host .250 cannot ping host .10 in the same intended /24 subnet,"Host A 192.168.1.250, Host B 192.168.1.10",IP Addressing,Medium,"HostA>ipconfig
+
+IPv4 Address. . . . . . . . . . . : 192.168.1.250
+Subnet Mask . . . . . . . . . . . : 255.255.255.128
+Default Gateway . . . . . . . . . : 192.168.1.1
+",Wrong subnet mask (255.255.255.128) places Host A in a different subnet than Host B,Layer 3
+CASE-024,Point-to-point link wasting addresses,WAN link between R1 and R2,IP Addressing,Low,"R1#show run interface Serial0/0/0
+interface Serial0/0/0
+ ip address 10.0.0.1 255.255.255.0
+",Using /24 (255.255.255.0) instead of /30 (255.255.255.252) for a point-to-point link,Layer 3
+CASE-025,No connectivity across switch link,Switch port connecting to another switch,Trunking,High,"Switch1#show interfaces Fa0/24 switchport
+Name: Fa0/24
+Switchport: Enabled
+Administrative Mode: static access
+Operational Mode: static access
+",Port Fa0/24 is configured as static access instead of trunk,Layer 2
+CASE-026,OSPF routes not appearing in routing table,R1 OSPF configuration,Routing,Medium,"R1#show ip protocols
+Routing Protocol is ""ospf 1""
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 10.0.0.1
+  Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+  Routing for Networks:
+    10.0.0.0 0.255.255.255 area 0
+","Wildcard mask is extremely broad (0.255.255.255) instead of specific (e.g., 0.0.0.255), possibly encompassing wrong interfaces",Layer 3
+CASE-027,Cannot telnet to switch for management,Switch management IP 10.1.1.10,Security,Medium,"Switch#show run | section line vty
+line vty 0 4
+ login
+ transport input ssh
+",Telnet is implicitly disabled because transport input is restricted to ssh only,Layer 7
+CASE-028,DHCP clients receive wrong gateway,"Router1 acts as DHCP server, Router1 LAN IP is 192.168.10.1",DHCP,High,"Router1#show run | section ip dhcp pool
+ip dhcp pool LAN
+ network 192.168.10.0 255.255.255.0
+ default-router 192.168.10.254
+ dns-server 8.8.8.8
+",Default router in DHCP pool is configured as .254 instead of .1,Layer 7
+CASE-029,"Port security triggered, port err-disabled",User plugged in a mini-switch to their wall jack,Security,High,"Switch#show interfaces Fa0/5 status
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Fa0/5                        err-disabled 10         auto    auto  10/100BaseTX
+Switch#show port-security interface Fa0/5
+Port Security              : Enabled
+Port Status                : Secure-down
+Violation Mode             : Shutdown
+Maximum MAC Addresses      : 1
+Total MAC Addresses        : 2
+","Port security violation: more than 1 MAC address learned (Total MAC: 2 > Max: 1), causing err-disable",Layer 2
+CASE-030,Inter-VLAN routing failing for VLAN 30,Router with multiple sub-interfaces,VLAN,High,"Router#show run interface Gi0/0.30
+interface GigabitEthernet0/0.30
+ encapsulation dot1Q 40
+ ip address 192.168.30.1 255.255.255.0
+",Sub-interface dot1Q encapsulation is mismatched (VLAN 40 tag instead of VLAN 30 tag),Layer 2
