@@ -151,6 +151,28 @@ st.markdown("""
         border-right: 1px solid rgba(255,255,255,0.05);
     }
 
+    /* Sidebar expand/collapse (>>) icon */
+    button[data-testid="stSidebarCollapsedControl"] {
+        background: transparent !important;
+        color: #00F2FE !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* SVG icon color */
+    button[data-testid="stSidebarCollapsedControl"] svg {
+        fill: #00F2FE !important;
+        stroke: #00F2FE !important;
+        width: 30px !important;
+        height: 30px !important;
+    }
+
+    /* Hover effect */
+    button[data-testid="stSidebarCollapsedControl"]:hover svg {
+        fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
+    }
+    
     /* Warning Banner */
     .warning-banner {
         background: rgba(69, 26, 3, 0.6);
